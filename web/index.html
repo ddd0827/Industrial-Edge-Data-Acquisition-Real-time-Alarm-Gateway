@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EdgeGuard · 工业边缘采集与告警网关</title>
+<style>
+:root {
+  --bg: #080d12;
+  --bg-soft: #0d151d;
+  --panel: #111c26;
+  --panel-2: #0f1821;
+  --line: rgba(148, 180, 197, 0.14);
+  --line-strong: rgba(148, 180, 197, 0.26);
+  --text: #dce8ef;
+  --muted: #7d93a2;
+  --teal: #2dd4bf;
+  --teal-soft: rgba(45, 212, 191, 0.12);
+  --amber: #f5b942;
+  --red: #f26d6d;
+  --blue: #63a8ff;
+  --green: #57d68d;
+  --radius: 16px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background:
+    radial-gradient(1100px 600px at 15% -10%, rgba(45, 212, 191, 0.10), transparent 60%),
+    radial-gradient(900px 500px at 95% 0%, rgba(80, 140, 220, 0.08), transparent 55%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+button, select { font-family: inherit; }
+button { color: inherit; }
+.shell { max-width: 1460px; margin: 0 auto; padding: 24px 28px 36px; }
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  padding: 8px 0 22px; border-bottom: 1px solid var(--line); margin-bottom: 22px;
+}
+.brand { display: flex; gap: 14px; align-items: center; min-width: 280px; }
+.logo {
+  width: 42px; height: 42px; border-radius: 12px;
+  background: linear-gradient(145deg, rgba(45, 212, 191, 0.25), rgba(45, 212, 191, 0.04));
+  border: 1px solid rgba(45, 212, 191, 0.4);
+  display: grid; place-items: center; flex: none;
+}
+.logo svg { width: 23px; height: 23px; }
+.brand h1 { margin: 0; font-size: 20px; letter-spacing: 0.02em; font-weight: 650; }
+.brand p { margin: 1px 0 0; color: var(--muted); font-size: 12px; letter-spacing: 0.02em; }
+.summary { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid var(--line); background: rgba(17, 28, 38, 0.72);
+  border-radius: 999px; padding: 6px 12px; color: var(--muted); font-size: 12px;
+  white-space: nowrap;
+}
+.chip b { color: var(--text); font-family: var(--mono); font-weight: 600; }
+.chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.chip.live .dot { background: var(--green); box-shadow: 0 0 0 4px rgba(87, 214, 141, 0.1); }
+.chip.error .dot { background: var(--red); }
+.banner {
+  display: none; margin-bottom: 16px; border: 1px solid rgba(242, 109, 109, 0.35);
+  background: rgba(242, 109, 109, 0.08); border-radius: 12px; padding: 10px 14px;
+  color: #ffb7b7; font-size: 13px;
+}
+.layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(340px, 0.9fr); gap: 20px; }
+.left, .right { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.panel {
+  background: linear-gradient(180deg, rgba(17, 28, 38, 0.92), rgba(12, 21, 29, 0.92));
+  border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 17px 20px 14px; border-bottom: 1px solid var(--line);
+}
+.panel-title { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+.panel-title .accent { width: 3px; height: 15px; border-radius: 2px; background: var(--teal); }
+.panel-title small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.panel-body { padding: 18px 20px 20px; }
+.devices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.device-card {
+  border: 1px solid var(--line); border-radius: 13px; background: rgba(8, 14, 20, 0.36);
+  overflow: hidden;
+}
+.device-top { display: flex; justify-content: space-between; gap: 10px; padding: 15px 16px 12px; }
+.device-name { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.status-dot.online { background: var(--green); box-shadow: 0 0 0 4px rgba(87, 214, 141, 0.10); }
+.status-dot.offline { background: var(--red); box-shadow: 0 0 0 4px rgba(242, 109, 109, 0.08); }
+.device-meta { color: var(--muted); font-size: 11px; font-family: var(--mono); margin-top: 5px; }
+.device-state { font-size: 11px; color: var(--muted); text-align: right; white-space: nowrap; }
+.device-state strong { color: var(--green); font-weight: 500; }
+.device-error {
+  margin: 0 16px 10px; padding: 7px 9px; border-radius: 8px; color: #ffb0b0;
+  background: rgba(242, 109, 109, 0.08); border: 1px solid rgba(242, 109, 109, 0.18);
+  font-size: 11px; font-family: var(--mono); overflow-wrap: anywhere;
+}
+.metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); border-top: 1px solid var(--line); }
+.metric-tile {
+  appearance: none; border: 0; background: var(--panel-2); text-align: left; cursor: pointer;
+  padding: 12px 14px 13px; transition: background 0.18s ease; min-width: 0;
+}
+.metric-tile:hover { background: #13222e; }
+.metric-tile.selected { background: rgba(45, 212, 191, 0.08); box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.25); }
+.metric-label { color: var(--muted); font-size: 11px; display: flex; justify-content: space-between; gap: 8px; }
+.metric-label code { font-family: var(--mono); font-size: 10px; color: #5f7786; }
+.metric-value { display: flex; align-items: baseline; gap: 5px; margin-top: 5px; min-width: 0; }
+.metric-value b { font-family: var(--mono); font-size: 20px; font-weight: 550; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; }
+.metric-value span { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.metric-tile.stale .metric-value b { color: #718593; }
+.metric-tile.boolean .metric-value b { font-family: var(--sans); font-size: 17px; }
+.metric-footer { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; color: #5e7483; font-size: 10px; font-family: var(--mono); }
+.chart-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+select {
+  appearance: none; background: #0b141c; color: var(--text); border: 1px solid var(--line-strong);
+  border-radius: 9px; padding: 7px 32px 7px 11px; font-size: 12px; min-width: 210px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+}
+.chart-wrap { position: relative; padding: 12px 14px 4px; }
+#chart { display: block; width: 100%; height: 300px; }
+.chart-empty {
+  position: absolute; inset: 12px 14px 4px; display: none; place-items: center;
+  color: var(--muted); font-size: 12px; pointer-events: none;
+}
+.chart-meta { display: flex; justify-content: space-between; gap: 12px; padding: 0 20px 16px; color: var(--muted); font-size: 11px; }
+.chart-meta .legend { display: flex; align-items: center; gap: 7px; }
+.legend-line { width: 18px; height: 2px; background: var(--teal); display: inline-block; border-radius: 2px; }
+.alarm-list { display: flex; flex-direction: column; gap: 8px; max-height: 490px; overflow-y: auto; padding-right: 3px; }
+.alarm {
+  position: relative; border: 1px solid var(--line); border-radius: 10px;
+  background: rgba(8, 14, 20, 0.46); padding: 11px 12px 10px 15px;
+}
+.alarm::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 2px; border-radius: 2px; background: var(--amber); }
+.alarm.critical::before { background: var(--red); }
+.alarm.info::before { background: var(--blue); }
+.alarm.cleared { opacity: 0.64; }
+.alarm.cleared::before { background: var(--green); }
+.alarm-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.alarm-title { font-size: 12px; font-weight: 600; }
+.alarm-time { color: var(--muted); font-family: var(--mono); font-size: 10px; white-space: nowrap; }
+.alarm-message { color: #9fb2be; font-size: 11px; margin-top: 4px; overflow-wrap: anywhere; }
+.alarm-foot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 7px; color: #617986; font-family: var(--mono); font-size: 10px; }
+.severity { text-transform: uppercase; letter-spacing: 0.08em; font-size: 9px; color: var(--amber); }
+.severity.critical { color: var(--red); }
+.severity.info { color: var(--blue); }
+.empty { color: var(--muted); text-align: center; padding: 30px 12px; font-size: 12px; }
+.rules-list { display: flex; flex-direction: column; gap: 8px; max-height: 330px; overflow-y: auto; padding-right: 3px; }
+.rule { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.rule:last-child { border-bottom: 0; }
+.rule-name { font-size: 12px; font-weight: 550; }
+.rule-code { color: var(--muted); font-family: var(--mono); font-size: 10px; margin-top: 3px; }
+.rule-badge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--amber); white-space: nowrap; }
+.rule-badge.critical { color: var(--red); }
+.rule-badge.info { color: var(--blue); }
+.footer {
+  display: flex; justify-content: space-between; align-items: center; gap: 18px; flex-wrap: wrap;
+  color: #607785; font-size: 11px; padding: 22px 2px 0; margin-top: 20px; border-top: 1px solid var(--line);
+}
+.footer a { color: #83a2b3; text-decoration: none; border-bottom: 1px dotted rgba(131,162,179,0.4); }
+.footer a:hover { color: var(--teal); }
+.links { display: flex; gap: 16px; }
+.toast-area { position: fixed; right: 22px; bottom: 22px; display: flex; flex-direction: column; gap: 8px; z-index: 20; max-width: 340px; }
+.toast {
+  border: 1px solid rgba(242, 109, 109, 0.35); background: #211419; color: #ffd3d3;
+  border-radius: 10px; padding: 10px 13px; font-size: 12px; box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+  animation: toast-in 0.24s ease both;
+}
+.toast.warning { border-color: rgba(245, 185, 66, 0.35); background: #211c12; color: #ffe4a8; }
+@keyframes toast-in { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@media (max-width: 1080px) {
+  .layout { grid-template-columns: 1fr; }
+  .right { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+}
+@media (max-width: 760px) {
+  .shell { padding: 18px 14px 28px; }
+  .topbar { align-items: flex-start; flex-direction: column; gap: 15px; }
+  .summary { justify-content: flex-start; }
+  .devices { grid-template-columns: 1fr; }
+  .right { display: flex; }
+  .panel-head { padding: 15px 15px 12px; }
+  .panel-body { padding: 15px; }
+  .chart-wrap { padding: 8px 6px 0; }
+  #chart { height: 230px; }
+  .chart-meta { padding: 0 15px 14px; }
+  .metric-value b { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M4 17.5 8.2 13l3 2.8L19.5 6" stroke="#2dd4bf" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 6.5v11h16" stroke="rgba(220,232,239,0.55)" stroke-width="1.3" stroke-linecap="round"/>
+          <circle cx="19.5" cy="6" r="2" fill="#2dd4bf"/>
+        </svg>
+      </div>
+      <div>
+        <h1>EdgeGuard</h1>
+        <p>工业边缘采集与实时告警网关</p>
+      </div>
+    </div>
+    <div class="summary">
+      <span class="chip live" id="streamChip"><span class="dot"></span><span id="streamLabel">实时流连接中</span></span>
+      <span class="chip">运行时长 <b id="uptimeValue">--</b></span>
+      <span class="chip">设备 <b id="deviceValue">--</b></span>
+      <span class="chip">活动告警 <b id="alarmValue" style="color:var(--amber)">--</b></span>
+      <span class="chip">样本 <b id="sampleValue">--</b></span>
+    </div>
+  </header>
+
+  <div class="banner" id="errorBanner"></div>
+
+  <main class="layout">
+    <section class="left">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span class="accent"></span>设备总览 <small>Modbus TCP · 边缘采集</small></div>
+          <span class="chip" style="padding:4px 9px;font-size:11px" id="healthChip"><span class="dot"></span><span>等待数据</span></span>
+        </div>
+        <div class="panel-body">
+          <div class="devices" id="devices">
+            <div class="empty" style="grid-column:1/-1">正在连接采集服务…</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span class="accent"></span>实时趋势 <small>最近 5 分钟</small></div>
+          <div class="chart-controls">
+            <select id="metricSelect" aria-label="选择要绘制的指标"></select>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chart"></canvas>
+          <div class="chart-empty" id="chartEmpty">暂无趋势数据，等待采集…</div>
+        </div>
+        <div class="chart-meta">
+          <span class="legend"><span class="legend-line"></span><span id="chartLegend">--</span></span>
+          <span id="chartRange">--</span>
+        </div>
+      </div>
+    </section>
+
+    <aside class="right">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span class="accent"></span>告警事件 <small id="alarmSubtitle">最近告警记录</small></div>
+          <span class="chip" style="padding:4px 9px;font-size:11px" id="alarmChip"><b>--</b> 活动</span>
+        </div>
+        <div class="panel-body">
+          <div class="alarm-list" id="alarmList">
+            <div class="empty">暂无告警，系统运行正常</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span class="accent"></span>已加载规则 <small>DSL 编译产物</small></div>
+          <span class="chip" style="padding:4px 9px;font-size:11px" id="ruleCount">--</span>
+        </div>
+        <div class="panel-body">
+          <div class="rules-list" id="rulesList">
+            <div class="empty">正在加载规则…</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    <span>EdgeGuard <span id="versionValue">1.0.0</span> · C++17 · Modbus TCP · SSE 实时通道</span>
+    <span class="links">
+      <a href="/api/v1/health" target="_blank" rel="noreferrer">健康检查</a>
+      <a href="/api/v1/overview" target="_blank" rel="noreferrer">设备快照</a>
+      <a href="/api/v1/rules" target="_blank" rel="noreferrer">规则列表</a>
+    </span>
+  </footer>
+</div>
+<div class="toast-area" id="toastArea"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const state = {
+    health: null,
+    overview: null,
+    rules: [],
+    alarms: [],
+    metrics: new Map(),
+    latest: new Map(),
+    selectedKey: null,
+    series: [],
+    seriesToken: 0,
+    stream: null,
+    streamReady: false,
+    alarmRefreshTimer: null,
+    errorVisible: false
+  };
+
+  const ui = {
+    devices: $("#devices"),
+    errorBanner: $("#errorBanner"),
+    uptime: $("#uptimeValue"),
+    deviceValue: $("#deviceValue"),
+    alarmValue: $("#alarmValue"),
+    sampleValue: $("#sampleValue"),
+    healthChip: $("#healthChip"),
+    streamChip: $("#streamChip"),
+    streamLabel: $("#streamLabel"),
+    metricSelect: $("#metricSelect"),
+    chart: $("#chart"),
+    chartEmpty: $("#chartEmpty"),
+    chartLegend: $("#chartLegend"),
+    chartRange: $("#chartRange"),
+    alarmList: $("#alarmList"),
+    alarmChip: $("#alarmChip"),
+    rulesList: $("#rulesList"),
+    ruleCount: $("#ruleCount"),
+    versionValue: $("#versionValue"),
+    toastArea: $("#toastArea")
+  };
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+  }
+
+  function showError(message) {
+    ui.errorBanner.textContent = message;
+    ui.errorBanner.style.display = "block";
+    state.errorVisible = true;
+  }
+
+  function clearError() {
+    if (state.errorVisible) {
+      ui.errorBanner.style.display = "none";
+      state.errorVisible = false;
+    }
+  }
+
+  async function api(path) {
+    const response = await fetch(path, { cache: "no-store" });
+    if (!response.ok) {
+      let detail = "";
+      try {
+        const body = await response.json();
+        detail = body.error ? ": " + body.error : "";
+      } catch (_) {
+        detail = "";
+      }
+      throw new Error(`${response.status} ${response.statusText}${detail}`);
+    }
+    return response.json();
+  }
+
+  function pad(value) { return String(value).padStart(2, "0"); }
+  function formatTime(ms, withSeconds = true) {
+    if (!Number.isFinite(ms)) return "--";
+    const date = new Date(ms);
+    const base = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    return withSeconds ? `${base}:${pad(date.getSeconds())}` : base;
+  }
+  function formatDuration(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return "--";
+    const total = Math.floor(ms / 1000);
+    const days = Math.floor(total / 86400);
+    const hours = Math.floor((total % 86400) / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${pad(minutes)}m`;
+    if (minutes > 0) return `${minutes}m ${pad(seconds)}s`;
+    return `${seconds}s`;
+  }
+  function formatNumber(value) {
+    if (!Number.isFinite(value)) return "—";
+    const abs = Math.abs(value);
+    if (abs >= 10000) return value.toLocaleString("zh-CN", { maximumFractionDigits: 0 });
+    if (abs >= 100) return value.toFixed(1);
+    if (abs >= 1) return value.toFixed(2);
+    return value.toFixed(3);
+  }
+  function compactNumber(value) {
+    if (!Number.isFinite(value)) return "--";
+    if (value >= 1e6) return (value / 1e6).toFixed(1) + "M";
+    if (value >= 1e3) return (value / 1e3).toFixed(1) + "k";
+    return String(value);
+  }
+
+  function severityClass(severity) {
+    const value = (severity || "warning").toLowerCase();
+    if (["critical", "fatal", "error"].includes(value)) return "critical";
+    if (["info", "debug"].includes(value)) return "info";
+    return "warning";
+  }
+
+  function toast(message, severity) {
+    const node = el("div", "toast " + (severity === "warning" ? "warning" : ""), message);
+    ui.toastArea.appendChild(node);
+    setTimeout(() => {
+      node.style.opacity = "0";
+      node.style.transition = "opacity .25s ease";
+      setTimeout(() => node.remove(), 280);
+    }, 5200);
+  }
+
+  function setStreamStatus(connected) {
+    state.streamReady = connected;
+    ui.streamChip.classList.toggle("live", connected);
+    ui.streamChip.classList.toggle("error", !connected);
+    ui.streamLabel.textContent = connected ? "实时流已连接" : "实时流重连中";
+  }
+
+  function indexMetrics(overview) {
+    const next = new Map();
+    for (const device of overview.devices || []) {
+      for (const metric of device.metrics || []) {
+        next.set(metric.key, {
+          ...metric,
+          device: device.name,
+          deviceLabel: device.display_name || device.name,
+          online: device.online,
+          interval: device.poll_interval_ms
+        });
+      }
+    }
+    state.metrics = next;
+  }
+
+  function buildMetricOptions() {
+    const entries = [...state.metrics.values()];
+    if (!entries.length) return;
+    const wanted = [];
+    for (const metric of entries) {
+      wanted.push({
+        key: metric.key,
+        label: `${metric.deviceLabel} · ${metric.name}${metric.unit ? " (" + metric.unit + ")" : ""}`
+      });
+    }
+    const existing = [...ui.metricSelect.options].map(option => option.value);
+    if (existing.length === wanted.length && existing.every((key, index) => key === wanted[index].key)) {
+      return;
+    }
+    ui.metricSelect.replaceChildren();
+    for (const item of wanted) {
+      const option = document.createElement("option");
+      option.value = item.key;
+      option.textContent = item.label;
+      ui.metricSelect.appendChild(option);
+    }
+    if (!state.selectedKey && wanted.length) {
+      const preferred = wanted.find(item => item.key.endsWith(".temp")) || wanted[0];
+      state.selectedKey = preferred.key;
+    }
+    if (state.selectedKey) {
+      ui.metricSelect.value = state.selectedKey;
+    }
+  }
+
+  function selectMetric(key) {
+    const metric = state.metrics.get(key);
+    if (!metric) return;
+    state.selectedKey = key;
+    ui.metricSelect.value = key;
+    for (const tile of ui.devices.querySelectorAll(".metric-tile")) {
+      tile.classList.toggle("selected", tile.dataset.metricKey === key);
+    }
+    ui.chartLegend.textContent = `${metric.deviceLabel} · ${metric.name}${metric.unit ? " / " + metric.unit : ""}`;
+    loadSeries();
+  }
+
+  async function loadSeries() {
+    const metric = state.metrics.get(state.selectedKey);
+    if (!metric) return;
+    const token = ++state.seriesToken;
+    try {
+      const query = new URLSearchParams({
+        device: metric.device,
+        metric: metric.name,
+        minutes: "5",
+        max_points: "600"
+      });
+      const data = await api("/api/v1/series?" + query.toString());
+      if (token !== state.seriesToken) return;
+      state.series = (data.points || []).map(point => ({ t: point.t, v: point.v }));
+      drawChart();
+      clearError();
+    } catch (error) {
+      if (token === state.seriesToken) {
+        showError("趋势数据加载失败：" + error.message);
+      }
+    }
+  }
+
+  function latestTimestamp(metric) {
+    const live = state.latest.get(metric.key);
+    if (live && Number.isFinite(live.ts)) return live.ts;
+    return metric.ts;
+  }
+
+  function metricStale(metric, online) {
+    const timestamp = latestTimestamp(metric);
+    if (!Number.isFinite(timestamp)) return true;
+    const threshold = Math.max((metric.interval || 500) * 6, 4000);
+    return Date.now() - timestamp > threshold;
+  }
+
+  function valueText(metric) {
+    if (metric.type === "bool") {
+      if (!Number.isFinite(metric.value)) return "—";
+      return metric.value >= 0.5 ? "运行" : "停止";
+    }
+    return formatNumber(metric.value);
+  }
+
+  function updateTile(tile, metric, online) {
+    const stale = metricStale(metric, online);
+    tile.classList.toggle("stale", stale || !online);
+    tile.classList.toggle("boolean", metric.type === "bool");
+    tile.classList.toggle("selected", metric.key === state.selectedKey);
+    const valueNode = tile.querySelector(".metric-value b");
+    const timeNode = tile.querySelector(".metric-time");
+    if (valueNode) valueNode.textContent = valueText(metric);
+    if (timeNode) timeNode.textContent = Number.isFinite(metric.ts) ? formatTime(metric.ts) : "无数据";
+    tile.title = `${metric.key}${metric.unit ? " · " + metric.unit : ""}`;
+  }
+
+  function renderOverview() {
+    const overview = state.overview;
+    if (!overview) return;
+    indexMetrics(overview);
+    buildMetricOptions();
+
+    ui.deviceValue.textContent = `${overview.online_devices}/${(overview.devices || []).length}`;
+    ui.alarmValue.textContent = String(overview.active_alarms ?? 0);
+    ui.alarmChip.innerHTML = "";
+    ui.alarmChip.appendChild(el("b", null, String(overview.active_alarms ?? 0)));
+    ui.alarmChip.appendChild(document.createTextNode(" 活动"));
+    ui.healthChip.classList.toggle("live", overview.online_devices > 0);
+    ui.healthChip.querySelector("span:last-child").textContent =
+      overview.online_devices > 0 ? "采集正常" : "设备离线";
+
+    ui.devices.replaceChildren();
+    if (!overview.devices || !overview.devices.length) {
+      ui.devices.appendChild(el("div", "empty", "尚未配置设备"));
+      return;
+    }
+
+    for (const device of overview.devices) {
+      const card = el("div", "device-card");
+      const top = el("div", "device-top");
+      const left = el("div");
+      const nameRow = el("div", "device-name");
+      const dot = el("span", "status-dot " + (device.online ? "online" : "offline"));
+      nameRow.appendChild(dot);
+      nameRow.appendChild(document.createTextNode(device.display_name || device.name));
+      left.appendChild(nameRow);
+      left.appendChild(el("div", "device-meta",
+        `${device.host}:${device.port} · unit ${device.unit_id} · ${device.poll_interval_ms} ms`));
+      const deviceState = el("div", "device-state");
+      const strong = el("strong", null, device.online ? "ONLINE" : "OFFLINE");
+      if (!device.online) strong.style.color = "var(--red)";
+      deviceState.appendChild(strong);
+      deviceState.appendChild(document.createElement("br"));
+      deviceState.appendChild(document.createTextNode(
+        device.last_sample_ms ? "最后数据 " + formatTime(device.last_sample_ms) : "等待首帧"
+      ));
+      top.appendChild(left);
+      top.appendChild(deviceState);
+      card.appendChild(top);
+
+      if (!device.online && device.last_error) {
+        card.appendChild(el("div", "device-error", device.last_error));
+      }
+
+      const metrics = el("div", "metrics");
+      for (const metric of device.metrics || []) {
+        const tile = el("button", "metric-tile");
+        tile.type = "button";
+        tile.dataset.metricKey = metric.key;
+        const label = el("div", "metric-label");
+        label.appendChild(el("span", null, metric.name));
+        label.appendChild(el("code", null, metric.type === "bool" ? "bool" : metric.key.split(".")[1]));
+        const value = el("div", "metric-value");
+        value.appendChild(el("b", null, valueText(metric)));
+        value.appendChild(el("span", null, metric.type === "bool" ? "状态" : (metric.unit || "")));
+        const footer = el("div", "metric-footer");
+        footer.appendChild(el("span", "metric-time", Number.isFinite(metric.ts) ? formatTime(metric.ts) : "无数据"));
+        footer.appendChild(el("span", null, metric.type === "bool" ? "DI" : "AI"));
+        tile.appendChild(label);
+        tile.appendChild(value);
+        tile.appendChild(footer);
+        tile.addEventListener("click", () => selectMetric(metric.key));
+        if (metric.key === state.selectedKey) tile.classList.add("selected");
+        metrics.appendChild(tile);
+        updateTile(tile, metric, device.online);
+      }
+      card.appendChild(metrics);
+      ui.devices.appendChild(card);
+    }
+
+    if (state.selectedKey) {
+      const metric = state.metrics.get(state.selectedKey);
+      if (metric) {
+        ui.chartLegend.textContent = `${metric.deviceLabel} · ${metric.name}${metric.unit ? " / " + metric.unit : ""}`;
+        ui.metricSelect.value = state.selectedKey;
+      }
+    }
+  }
+
+  function updateSummary() {
+    const health = state.health;
+    if (!health) return;
+    ui.uptime.textContent = formatDuration(health.uptime_ms);
+    ui.sampleValue.textContent = compactNumber(health.processed_samples);
+    ui.alarmValue.textContent = String(health.active_alarms ?? 0);
+    ui.versionValue.textContent = health.version || "1.0.0";
+  }
+
+  async function refreshHealth() {
+    try {
+      state.health = await api("/api/v1/health");
+      updateSummary();
+      clearError();
+    } catch (error) {
+      showError("健康检查失败：" + error.message);
+    }
+  }
+
+  async function refreshOverview() {
+    try {
+      state.overview = await api("/api/v1/overview");
+      renderOverview();
+      clearError();
+    } catch (error) {
+      showError("设备快照加载失败：" + error.message);
+    }
+  }
+
+  function renderAlarms() {
+    const alarms = state.alarms.slice(0, 30);
+    ui.alarmList.replaceChildren();
+    if (!alarms.length) {
+      ui.alarmList.appendChild(el("div", "empty", "暂无告警，系统运行正常"));
+      return;
+    }
+    for (const alarm of alarms) {
+      const severity = severityClass(alarm.severity);
+      const card = el("div", "alarm " + severity + (alarm.action === "cleared" ? " cleared" : ""));
+      const head = el("div", "alarm-head");
+      head.appendChild(el("span", "alarm-title", alarm.title || alarm.rule));
+      head.appendChild(el("span", "alarm-time", formatTime(alarm.ts)));
+      card.appendChild(head);
+      card.appendChild(el("div", "alarm-message", alarm.message || ""));
+      const foot = el("div", "alarm-foot");
+      foot.appendChild(el("span", "severity " + severity, alarm.severity || "warning"));
+      foot.appendChild(el("span", null, alarm.action === "cleared" ? "已恢复" : "触发"));
+      foot.appendChild(el("span", null, alarm.code || ""));
+      if (alarm.metric) foot.appendChild(el("span", null, `${alarm.metric} = ${formatNumber(alarm.value)}`));
+      card.appendChild(foot);
+      ui.alarmList.appendChild(card);
+    }
+  }
+
+  async function refreshAlarms() {
+    try {
+      const data = await api("/api/v1/alarms?limit=80");
+      state.alarms = data.alarms || [];
+      renderAlarms();
+      ui.alarmChip.innerHTML = "";
+      ui.alarmChip.appendChild(el("b", null, String(data.active ?? 0)));
+      ui.alarmChip.appendChild(document.createTextNode(" 活动"));
+      renderSummaryAlarm(data.active ?? 0);
+      clearError();
+    } catch (error) {
+      showError("告警列表加载失败：" + error.message);
+    }
+  }
+
+  function renderSummaryAlarm(active) {
+    if (state.overview) {
+      state.overview.active_alarms = active;
+      ui.alarmValue.textContent = String(active);
+    }
+  }
+
+  function renderRules() {
+    ui.rulesList.replaceChildren();
+    ui.ruleCount.textContent = `${state.rules.length} 条`;
+    if (!state.rules.length) {
+      ui.rulesList.appendChild(el("div", "empty", "未加载规则"));
+      return;
+    }
+    for (const rule of state.rules) {
+      const row = el("div", "rule");
+      const text = el("div");
+      text.appendChild(el("div", "rule-name", rule.title || rule.name));
+      text.appendChild(el("div", "rule-code",
+        `${rule.code} · debounce ${formatDuration(rule.for_ms)}${rule.has_clear ? " / clear " + formatDuration(rule.clear_for_ms) : ""}`));
+      const severity = severityClass(rule.severity);
+      row.appendChild(text);
+      row.appendChild(el("div", "rule-badge " + severity, rule.severity || "warning"));
+      ui.rulesList.appendChild(row);
+    }
+  }
+
+  async function refreshRules() {
+    try {
+      const data = await api("/api/v1/rules");
+      state.rules = data.rules || [];
+      renderRules();
+    } catch (error) {
+      showError("规则加载失败：" + error.message);
+    }
+  }
+
+  function appendLiveSample(sample) {
+    const metric = state.metrics.get(sample.key);
+    if (!metric) return;
+    state.latest.set(sample.key, sample);
+    metric.value = sample.value;
+    metric.ts = sample.ts;
+    const tile = ui.devices.querySelector(`.metric-tile[data-metric-key="${CSS.escape(sample.key)}"]`);
+    if (tile) {
+      const device = (state.overview?.devices || []).find(item => item.name === sample.device);
+      updateTile(tile, metric, !device || device.online);
+    }
+    if (state.selectedKey === sample.key) {
+      state.series.push({ t: sample.ts, v: sample.value });
+      const cutoff = sample.ts - 5 * 60 * 1000;
+      state.series = state.series.filter(point => point.t >= cutoff);
+      drawChart();
+    }
+  }
+
+  function handleStreamAlarm(alarm) {
+    if (alarm.action === "raised") {
+      toast(`${alarm.title || alarm.rule}：${alarm.message || alarm.code}`, alarm.severity);
+    }
+    refreshAlarms();
+    refreshHealth();
+  }
+
+  function connectStream() {
+    if (!("EventSource" in window)) {
+      setStreamStatus(false);
+      return;
+    }
+    if (state.stream) state.stream.close();
+    const stream = new EventSource("/api/v1/stream");
+    state.stream = stream;
+    stream.addEventListener("open", () => setStreamStatus(true));
+    stream.addEventListener("ready", () => setStreamStatus(true));
+    stream.addEventListener("sample", event => {
+      setStreamStatus(true);
+      try { appendLiveSample(JSON.parse(event.data)); } catch (_) { /* ignore malformed event */ }
+    });
+    stream.addEventListener("alarm", event => {
+      setStreamStatus(true);
+      try { handleStreamAlarm(JSON.parse(event.data)); } catch (_) { /* ignore */ }
+    });
+    stream.onerror = () => {
+      setStreamStatus(false);
+      // EventSource reconnects automatically; polling keeps the UI fresh meanwhile.
+    };
+  }
+
+  function drawChart() {
+    const canvas = ui.chart;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const width = Math.max(rect.width, 320);
+    const height = Math.max(rect.height, 220);
+    if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    const points = state.series;
+    ui.chartEmpty.style.display = points.length ? "none" : "grid";
+    if (!points.length) {
+      ui.chartRange.textContent = "--";
+      return;
+    }
+
+    const metric = state.metrics.get(state.selectedKey);
+    const pad = { left: 46, right: 18, top: 18, bottom: 26 };
+    const plotWidth = width - pad.left - pad.right;
+    const plotHeight = height - pad.top - pad.bottom;
+    const values = points.map(point => point.v).filter(Number.isFinite);
+    let minValue = Math.min(...values);
+    let maxValue = Math.max(...values);
+    if (metric && metric.type === "bool") {
+      minValue = -0.1;
+      maxValue = 1.1;
+    } else if (minValue === maxValue) {
+      const delta = Math.abs(minValue) * 0.08 + 1;
+      minValue -= delta;
+      maxValue += delta;
+    } else {
+      const padding = (maxValue - minValue) * 0.12;
+      minValue -= padding;
+      maxValue += padding;
+    }
+    const now = Date.now();
+    const lastTimestamp = points[points.length - 1].t;
+    const rightEdge = Math.max(now, lastTimestamp);
+    const leftEdge = rightEdge - 5 * 60 * 1000;
+
+    const xFor = timestamp => pad.left + ((timestamp - leftEdge) / (rightEdge - leftEdge)) * plotWidth;
+    const yFor = value => pad.top + (1 - (value - minValue) / (maxValue - minValue)) * plotHeight;
+
+    ctx.font = "11px " + getComputedStyle(document.body).getPropertyValue("--mono");
+    ctx.textBaseline = "middle";
+
+    const gridCount = 4;
+    for (let i = 0; i <= gridCount; ++i) {
+      const y = pad.top + (plotHeight * i) / gridCount;
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(width - pad.right, y);
+      ctx.strokeStyle = "rgba(148,180,197,0.11)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      const value = maxValue - ((maxValue - minValue) * i) / gridCount;
+      ctx.fillStyle = "#68808f";
+      ctx.textAlign = "right";
+      ctx.fillText(metric && metric.type === "bool" ? (value > 0.5 ? "1" : "0") : formatNumber(value), pad.left - 9, y);
+    }
+
+    for (let i = 0; i <= 3; ++i) {
+      const x = pad.left + (plotWidth * i) / 3;
+      ctx.beginPath();
+      ctx.moveTo(x, pad.top);
+      ctx.lineTo(x, height - pad.bottom);
+      ctx.strokeStyle = "rgba(148,180,197,0.055)";
+      ctx.stroke();
+      ctx.fillStyle = "#68808f";
+      ctx.textAlign = i === 0 ? "left" : (i === 3 ? "right" : "center");
+      const timestamp = leftEdge + ((rightEdge - leftEdge) * i) / 3;
+      ctx.fillText(formatTime(timestamp, false), x, height - pad.bottom + 14);
+    }
+
+    const visible = points.filter(point => point.t >= leftEdge && point.t <= rightEdge + 1000);
+    if (!visible.length) {
+      ui.chartEmpty.style.display = "grid";
+      return;
+    }
+
+    const gradient = ctx.createLinearGradient(0, pad.top, 0, height - pad.bottom);
+    gradient.addColorStop(0, "rgba(45, 212, 191, 0.20)");
+    gradient.addColorStop(1, "rgba(45, 212, 191, 0.01)");
+
+    ctx.beginPath();
+    if (metric && metric.type === "bool") {
+      visible.forEach((point, index) => {
+        const x = xFor(point.t);
+        const y = yFor(point.v);
+        if (index === 0) ctx.moveTo(x, y);
+        else {
+          ctx.lineTo(x, yFor(visible[index - 1].v));
+          ctx.lineTo(x, y);
+        }
+      });
+    } else {
+      visible.forEach((point, index) => {
+        const x = xFor(point.t);
+        const y = yFor(point.v);
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+    }
+    const last = visible[visible.length - 1];
+    const first = visible[0];
+    ctx.lineTo(xFor(last.t), height - pad.bottom);
+    ctx.lineTo(xFor(first.t), height - pad.bottom);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    ctx.beginPath();
+    visible.forEach((point, index) => {
+      const x = xFor(point.t);
+      const y = yFor(point.v);
+      if (index === 0) ctx.moveTo(x, y);
+      else if (metric && metric.type === "bool") {
+        ctx.lineTo(x, yFor(visible[index - 1].v));
+        ctx.lineTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+    ctx.strokeStyle = "#2dd4bf";
+    ctx.lineWidth = 1.9;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.stroke();
+
+    const lastX = xFor(last.t);
+    const lastY = yFor(last.v);
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = "#2dd4bf";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 7, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(45,212,191,0.14)";
+    ctx.fill();
+
+    ui.chartRange.textContent = `${formatTime(first.t)} → ${formatTime(last.t)}`;
+  }
+
+  ui.metricSelect.addEventListener("change", () => {
+    selectMetric(ui.metricSelect.value);
+  });
+
+  window.addEventListener("resize", () => drawChart());
+
+  async function bootstrap() {
+    await refreshHealth();
+    await refreshOverview();
+    await refreshRules();
+    await refreshAlarms();
+    if (state.selectedKey) await loadSeries();
+    connectStream();
+  }
+
+  setInterval(refreshHealth, 5000);
+  setInterval(refreshOverview, 3000);
+  setInterval(refreshAlarms, 8000);
+  setInterval(drawChart, 10000);
+  setInterval(() => {
+    if (state.selectedKey) loadSeries();
+  }, 15000);
+
+  bootstrap().catch(error => showError("初始化失败：" + error.message));
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+# 1 号产线边缘告警规则
+# 语法: rule <名称> "<标题>" { when <表达式> [for <时长>] [clear when ...] emit { ... } }
+
+rule boiler_overheat "1号锅炉温度过高" {
+    # 超过 85 ℃ 持续 3 秒才触发，回落到 80 ℃ 以下并持续 3 秒才恢复。
+    when boiler_01.temp > 85.0
+    for 3s
+    clear when boiler_01.temp < 80.0 for 3s
+    emit {
+        severity = critical
+        code = BOILER_OVERHEAT
+        message = "1号锅炉温度超过 85℃，请检查燃烧与循环系统"
+    }
+}
+
+rule boiler_pressure_high "1号锅炉压力异常" {
+    when boiler_01.pressure > 1.30 and boiler_01.pump_on == true
+    for 2s
+    clear when boiler_01.pressure < 1.15 for 3s
+    emit {
+        severity = warning
+        code = BOILER_PRESSURE_HIGH
+        message = "锅炉压力超过 1.30 MPa 且循环泵运行，请检查负荷与管路"
+    }
+}
+
+rule boiler_vibration_high "1号锅炉振动偏高" {
+    when boiler_01.vibration > 4.5
+    for 4s
+    clear when boiler_01.vibration < 4.0 for 3s
+    emit {
+        severity = warning
+        code = BOILER_VIBRATION_HIGH
+        message = "锅炉振动超过 4.5 mm/s，建议检查风机与轴承"
+    }
+}
+
+rule pump_flow_low "2号循环泵流量不足" {
+    # 流量低于 25 m³/h 持续 5 秒触发，恢复阈值采用滞回以避免抖动。
+    when pump_02.flow < 25.0
+    for 5s
+    clear when pump_02.flow > 32.0 for 4s
+    emit {
+        severity = warning
+        code = PUMP_FLOW_LOW
+        message = "循环泵流量低于 25 m³/h，请检查过滤器与叶轮"
+    }
+}

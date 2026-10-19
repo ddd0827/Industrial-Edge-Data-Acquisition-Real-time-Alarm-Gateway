@@ -1,0 +1,26 @@
+# Build output
+build/
+cmake-build-*/
+out/
+bin/
+
+# Runtime data
+data/
+logs/
+*.wal
+*.log
+
+# IDE / OS
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Compiled files
+*.exe
+*.obj
+*.o
+*.pdb
+*.ilk
+*.dSYM/
